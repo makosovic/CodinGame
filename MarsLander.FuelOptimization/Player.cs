@@ -44,9 +44,11 @@ struct Constants
 {
     public static int AllowedHorizontalSpeed = 20;
     public static int AllowedVerticalSpeed = 40;
-    public static int DistanceFromLandingStartCorrecting = 750;
-    public static double AngleCorrectionFactor = 0.75;
-    public static int DistanceFromFlatLandStart = 50;
+    public static int HorizontalSpeedCorrectionAngle = 30;
+    public static int MaxHorizontalSpeed = 50;
+    public static int MinHeightFromFlatLand = 50;
+    public static int MinHeightForCorrectingHorizontalSpeed = 250;
+    public static int IgnoreHorizontalSpeed = 5;
 }
 
 class RoverPositioningSystem
@@ -77,6 +79,11 @@ class MoveFactory
     private readonly bool _isPositionedForLanding;
     private readonly bool _isHorizontalSpeedAcceptable;
     private readonly bool _isVerticalSpeedAcceptable;
+    private readonly bool _isHorizontalSpeedTooMuch;
+    private readonly bool _isHeightCritical;
+    private readonly bool _isRoverLeveled;
+    private readonly bool _isThereRoomForCorrectingHorizontalSpeed;
+    private readonly bool _isHorizontalSpeedMiniscule;
 
     public MoveFactory(RoverSensorData rsd, Line flatLand)
     {
@@ -84,15 +91,32 @@ class MoveFactory
         _flatLand = flatLand;
 
         _isPositionedForLanding = rsd.Position.x > _flatLand.Start.x && rsd.Position.x < _flatLand.End.x;
-        _isHorizontalSpeedAcceptable = rsd.HorizonalSpeed <= Constants.AllowedHorizontalSpeed && rsd.RotationAngle == 0;
-        _isVerticalSpeedAcceptable = rsd.VerticalSpeed <= Constants.AllowedVerticalSpeed;
+        _isHorizontalSpeedAcceptable = Math.Abs(rsd.HorizonalSpeed) <= Constants.AllowedHorizontalSpeed;
+        _isRoverLeveled = rsd.RotationAngle == 0;
+        _isThereRoomForCorrectingHorizontalSpeed = (rsd.Position.y - _flatLand.Start.y) > Constants.MinHeightForCorrectingHorizontalSpeed;
+        _isHorizontalSpeedMiniscule = Math.Abs(rsd.HorizonalSpeed) < Constants.IgnoreHorizontalSpeed;
+        _isVerticalSpeedAcceptable = Math.Abs(rsd.VerticalSpeed) <= Constants.AllowedVerticalSpeed - 5;
+        _isHorizontalSpeedTooMuch = Math.Abs(rsd.HorizonalSpeed) > Constants.MaxHorizontalSpeed;
+        _isHeightCritical = (rsd.Position.y - _flatLand.Start.y) < Constants.MinHeightFromFlatLand;
     }
 
     public BaseMove NextMove()
     {
+        if (_isHeightCritical && !_isPositionedForLanding)
+        {
+            return new FixHeight(_rsd);
+        }
+        if (_isHorizontalSpeedTooMuch)
+        {
+            return new FixHorizontalSpeed(_rsd);
+        }
         if (!_isPositionedForLanding)
         {
             return new PositionForLanding(_rsd) { FlatLand = _flatLand };
+        }
+        if (_isThereRoomForCorrectingHorizontalSpeed && !_isHorizontalSpeedMiniscule)
+        {
+            return new FixHorizontalSpeed(_rsd);
         }
         if (!_isHorizontalSpeedAcceptable)
         {
@@ -103,7 +127,7 @@ class MoveFactory
             return new FixVerticalSpeed(_rsd);
         }
 
-        return new FreeFall(_rsd);
+        return new KindaFreeFall(_rsd);
     }
 }
 
@@ -111,21 +135,12 @@ class PositionForLanding : BaseMove
 {
     public override void Calculate()
     {
-        if (Math.Abs(Math.Min(_rsd.Position.x - FlatLand.Start.x, _rsd.Position.x - FlatLand.End.x)) < Constants.DistanceFromLandingStartCorrecting)
-        {
-            _rotationAngle = Convert.ToInt32(_rsd.RotationAngle * Constants.AngleCorrectionFactor);
-            _throtlePower = 4;
-        }
-        else if (_rsd.Position.x < FlatLand.Start.x)
-        {
-            _rotationAngle = -15;
-            _throtlePower = 4;
-        }
-        else
-        {
-            _rotationAngle = 15;
-            _throtlePower = 4;
-        }
+        Point closestFlatLandPoint = new Point(Math.Abs(FlatLand.Start.x - _rsd.Position.x) < Math.Abs(FlatLand.End.x - _rsd.Position.x) ? FlatLand.Start.x : FlatLand.End.x, FlatLand.Start.y);
+        double a = _rsd.Position.y - closestFlatLandPoint.y;
+        double b = Math.Abs(_rsd.Position.x - closestFlatLandPoint.x);
+        int direction = (_rsd.Position.x - closestFlatLandPoint.x) > 0 ? 1 : -1;
+        _rotationAngle = direction * Convert.ToInt32(Math.Asin(b / (Math.Sqrt(Math.Pow(a, 2) + Math.Pow(b, 2)))) * 180 / Math.PI);
+        _throtlePower = 4;
         Console.Error.WriteLine("PositionForLanding");
     }
 
@@ -139,16 +154,8 @@ class FixHorizontalSpeed : BaseMove
 {
     public override void Calculate()
     {
-        if (_rsd.HorizonalSpeed > 0)
-        {
-            _rotationAngle = -Math.Abs(Convert.ToInt32(_rsd.RotationAngle*Constants.AngleCorrectionFactor));
-        }
-        else
-        {
-            _rotationAngle = Math.Abs(Convert.ToInt32(_rsd.RotationAngle * Constants.AngleCorrectionFactor));
-        }
-        _throtlePower = 3;
-        
+        _rotationAngle = _rsd.HorizonalSpeed > 0 ? Constants.HorizontalSpeedCorrectionAngle : -Constants.HorizontalSpeedCorrectionAngle;
+        _throtlePower = 4;
         Console.Error.WriteLine("FixHorizontalSpeed");
     }
 
@@ -165,7 +172,6 @@ class FixVerticalSpeed : BaseMove
         _rotationAngle = 0;
         _throtlePower = 4;
         Console.Error.WriteLine("FixVerticalSpeed");
-
     }
 
     public FixVerticalSpeed(RoverSensorData rsd)
@@ -174,17 +180,31 @@ class FixVerticalSpeed : BaseMove
     }
 }
 
-class FreeFall : BaseMove
+class KindaFreeFall : BaseMove
 {
     public override void Calculate()
     {
         _rotationAngle = 0;
-        _throtlePower = 0;
-        Console.Error.WriteLine("FreeFall");
-
+        _throtlePower = 1;
+        Console.Error.WriteLine("KindaFreeFall");
     }
 
-    public FreeFall(RoverSensorData rsd)
+    public KindaFreeFall(RoverSensorData rsd)
+        : base(rsd)
+    {
+    }
+}
+
+class FixHeight : BaseMove
+{
+    public override void Calculate()
+    {
+        _rotationAngle = 0;
+        _throtlePower = 4;
+        Console.Error.WriteLine("FixHeight");
+    }
+
+    public FixHeight(RoverSensorData rsd)
         : base(rsd)
     {
     }
