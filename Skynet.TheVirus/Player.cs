@@ -65,35 +65,89 @@ public class Tree<T> where T : struct
     }
 }
 
+public class SkynetTopologyFactory
+{
+    public Tree<int> CreateTree(int rootValue, List<Tuple<int, int>> links, List<int> gateways)
+    {
+        Tree<int> tree = new Tree<int>(rootValue);
+
+        Queue<Node<int>> nodesToBeVisited = new Queue<Node<int>>(new[] { tree.Root });
+
+        while (nodesToBeVisited.Count > 0)
+        {
+            Node<int> node = nodesToBeVisited.Dequeue();
+
+            foreach (Tuple<int, int> link in links)
+            {
+                if (link.Item1 == node.Value && !gateways.Contains(link.Item2))
+                {
+                    Node<int> childNode = node.AddChild(link.Item2);
+                    if (NodeWasNotVisitedInThisPath(node, childNode.Value))
+                    {
+                        nodesToBeVisited.Enqueue(childNode);
+                    }
+                }
+                else if (link.Item2 == node.Value && !gateways.Contains(link.Item1))
+                {
+                    Node<int> childNode = node.AddChild(link.Item1);
+                    if (NodeWasNotVisitedInThisPath(node, childNode.Value))
+                    {
+                        nodesToBeVisited.Enqueue(childNode);
+                    }
+                }
+            }
+        }
+
+        return tree;
+    }
+
+    private bool NodeWasNotVisitedInThisPath(Node<int> node, int value)
+    {
+        if (node.Value == value)
+        {
+            return false;
+        }
+        else if (node.Parent == null)
+        {
+            return true;
+        }
+        else
+        {
+            return NodeWasNotVisitedInThisPath(node.Parent, value);
+        }
+    }
+}
+
 class Player
 {
     static void Main(string[] args)
     {
         List<int> gateways = new List<int>();
-        List<Tree<int>> gatewayTrees = new List<Tree<int>>();
         List<Tuple<int, int>> links = new List<Tuple<int, int>>();
+        List<Tree<int>> gatewayTrees = new List<Tree<int>>();
 
         string[] inputs;
         inputs = Console.ReadLine().Split(' ');
         int N = int.Parse(inputs[0]); // the total number of nodes in the level, including the gateways
         int L = int.Parse(inputs[1]); // the number of links
         int E = int.Parse(inputs[2]); // the number of exit gateways
+
         for (int i = 0; i < L; i++)
         {
             inputs = Console.ReadLine().Split(' ');
             links.Add(new Tuple<int, int>(int.Parse(inputs[0]), int.Parse(inputs[1])));
-            links.Add(new Tuple<int, int>(int.Parse(inputs[1]), int.Parse(inputs[0])));
         }
+
         for (int i = 0; i < E; i++)
         {
             int EI = int.Parse(Console.ReadLine()); // the index of a gateway node
             gateways.Add(EI);
-            gatewayTrees.Add(new Tree<int>(EI));
         }
 
-        foreach (Tree<int> gatewayTree in gatewayTrees)
+        foreach (var gateway in gateways)
         {
-            CreateTree(gatewayTree, links, gateways);
+            SkynetTopologyFactory factory = new SkynetTopologyFactory();
+            gatewayTrees.Add(factory.CreateTree(gateway, links, gateways));
         }
 
         // game loop
@@ -124,42 +178,6 @@ class Player
             // Write an action using Console.WriteLine()
             // To debug: Console.Error.WriteLine("Debug messages...");
         }
-    }
-
-    private static Tree<int> CreateTree(int rootValue, List<Tuple<int, int>> links, List<int> gateways)
-    {
-        Tree<int> tree = new Tree<int>(rootValue);
-
-        List<Tuple<int, int>> addedLinks = new List<Tuple<int, int>>();
-        Queue<Node<int>> nodesToBeVisited = new Queue<Node<int>>(new[] { tree.Root });
-
-        while (nodesToBeVisited.Count > 0)
-        {
-            Node<int> node = nodesToBeVisited.Dequeue();
-            foreach (Tuple<int, int> link in links)
-            {
-                if (link.Item1 == node.Value && !gateways.Contains(link.Item2))
-                {
-                    if (!addedLinks.Contains(link))
-                    {
-                        Node<int> childNode = node.AddChild(link.Item2);
-                        nodesToBeVisited.Enqueue(childNode);
-                        addedLinks.Add(link);
-                    }
-                }
-                else if (link.Item2 == node.Value && !gateways.Contains(link.Item1))
-                {
-                    if (!addedLinks.Contains(link))
-                    {
-                        Node<int> childNode = node.AddChild(link.Item1);
-                        nodesToBeVisited.Enqueue(childNode);
-                        addedLinks.Add(link);
-                    }
-                }
-            }
-        }
-
-        return tree;
     }
 
     private static void SeverNode(List<Tree<int>> gatewayTrees, int parentNodeValue, int infectedNodeValue)

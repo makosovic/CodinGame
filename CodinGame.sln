@@ -45,6 +45,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TheParanoidAndroid.CodeSize
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skynet.TheVirus", "Skynet.TheVirus\Skynet.TheVirus.csproj", "{22ECBD07-E10C-4995-8CC5-55F486F4A714}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skynet.TheVirus.Tests", "Skynet.TheVirus.Tests\Skynet.TheVirus.Tests.csproj", "{F6C2E168-F094-45EB-A5A2-15CC539F635E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -119,6 +121,10 @@ Global
 		{22ECBD07-E10C-4995-8CC5-55F486F4A714}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{22ECBD07-E10C-4995-8CC5-55F486F4A714}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{22ECBD07-E10C-4995-8CC5-55F486F4A714}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6C2E168-F094-45EB-A5A2-15CC539F635E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6C2E168-F094-45EB-A5A2-15CC539F635E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6C2E168-F094-45EB-A5A2-15CC539F635E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6C2E168-F094-45EB-A5A2-15CC539F635E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -144,5 +150,6 @@ Global
 		{E7D4CDC3-7F23-4C05-B5B6-25B9031D8E06} = {663871AB-DB9F-43EB-A5C0-6A154B2CE797}
 		{5F5A5EED-020C-42DB-8261-47A1CE09BB17} = {D50E60C4-8A5A-4711-9AAA-D2808A33F912}
 		{22ECBD07-E10C-4995-8CC5-55F486F4A714} = {663871AB-DB9F-43EB-A5C0-6A154B2CE797}
+		{F6C2E168-F094-45EB-A5A2-15CC539F635E} = {663871AB-DB9F-43EB-A5C0-6A154B2CE797}
 	EndGlobalSection
 EndGlobal
