@@ -172,15 +172,36 @@ public class ModifyExistingMove : BaseMove
 
         if (diff > 0)
         {
-            for (int i = 0; i < diff; i++)
+            if (diff > 14)
             {
-                _output.Append('<');
-                _gameState.CurrentIndex--;
+                for (int i = 0; i < 27 - diff; i++)
+                {
+                   _output.Append('>');
+                   _gameState.CurrentIndex = ((_gameState.CurrentIndex + 1)%27);                
+                }       
+            }     
+            else
+            {
+                for (int i = 0; i < diff; i++)
+                {
+                    _output.Append('<');
+                    _gameState.CurrentIndex--;            
+                }
             }
         }
         else if (diff < 0)
         {
-            for (int i = _gameState.CurrentIndex; i < CharToModifyIndex; i++)
+            if (diff < -14)
+            {
+                for (int i = 0; i < 27 - diff; i++)
+                {
+                   _output.Append('>');
+                   _gameState.CurrentIndex = ((_gameState.CurrentIndex + 1)%27);                
+                }       
+            }     
+            else
+            {            
+                for (int i = _gameState.CurrentIndex; i < CharToModifyIndex; i++)
             {
                 _output.Append('>');
                 _gameState.CurrentIndex++;
