@@ -99,9 +99,17 @@ public class CreateNewMove : BaseMove
             _gameState.CurrentIndex += shifts;
         }
 
-        for (int i = 0; i < Array.IndexOf(Alphabet.Letters, NextChar); i++)
+
+        for (int i = 0; i < Math.Min(Array.IndexOf(Alphabet.Letters, NextChar), Math.Abs(Array.IndexOf(Alphabet.Letters, NextChar) - 27)); i++)
         {
-            _output.Append('+');
+            if (Array.IndexOf(Alphabet.Letters, NextChar) <= 13)
+            {
+                _output.Append('+');
+            }
+            else
+            {
+                _output.Append('-');
+            }
         }
 
         _output.Append('.');
@@ -266,10 +274,10 @@ public class Game
     {
         _state = move.GameState;
         _state.Output.Append(move.Output);
-        
+
         if (move.MoveType == MoveType.ModifyExisting)
         {
-            ModifyExistingMove modifyMove = (ModifyExistingMove) move;
+            ModifyExistingMove modifyMove = (ModifyExistingMove)move;
             _state.Stones[modifyMove.CharToModifyIndex] = modifyMove.NextChar;
         }
     }
