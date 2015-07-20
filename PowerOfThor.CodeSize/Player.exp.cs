@@ -1,10 +1,9 @@
 ﻿//using System;
-//using System.Linq;
 //class P
 //{
 //    static void Main()
 //    {
-//        var i = Console.ReadLine().Split(' ').Select(int.Parse).ToArray();
+//        var i=Array.ConvertAll(Console.ReadLine().Split(' '),int.Parse);
 //        int a = i[3], b = i[2], c = i[1], d = i[0];
 //        for (; ; )
 //        {
