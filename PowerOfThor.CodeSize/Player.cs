@@ -1,1 +1,1 @@
-﻿using System;using System.Linq;class P{static void Main(){var i=Console.ReadLine().Split(' ').Select(int.Parse).ToArray();while(true){string m="";if(i[1]<i[3]){i[3]--;m="N";}else if(i[1]>i[3]){i[3]++;m="S";}if(i[0]>i[2]){i[2]++;m+="E";}else if (i[0]<i[2]){i[2]--;m+="W";}Console.WriteLine(m);}}}
+﻿using System;using System.Linq;class P{static void Main(){var i=Console.ReadLine().Split(' ').Select(int.Parse).ToArray();int a=i[3],b=i[2],c=i[1],d=i[0];for(;;){var m="";if(c<a){a--;m="N";}else if(c>a){a++;m="S";}if(d>b){b++;m+="E";}else if(d<b){b--;m+="W";}Console.WriteLine(m);}}}
