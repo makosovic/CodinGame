@@ -1,15 +1,12 @@
-﻿
-
-
-
-
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Player
 {
+
+    #region skeleton
     public class Point
     {
         public int X { get; set; }
@@ -43,10 +40,12 @@ namespace Player
     {
         public int Id { get; set; }
         public Point Position { get; set; }
+        public int TeamId { get; set; }
 
-        public Drone(int droneId)
+        public Drone(int droneId, int teamId)
         {
             Id = droneId;
+            TeamId = teamId;
         }
     }
 
@@ -57,6 +56,7 @@ namespace Player
         public const double SquareRadius = 70.7106781;
 
         public Point Center { get; set; }
+        public int Id { get; set; }
         public int OwnerId { get; set; }
         public List<Drone> Drones { get; set; }
 
@@ -68,11 +68,11 @@ namespace Player
 
     public class Team
     {
-        public Team(int droneCount)
+        public Team(int droneCount, int teamId)
         {
             Drones = new List<Drone>(droneCount);
-            for (var droneId = 0; droneId < droneCount; droneId++)
-                Drones.Add(new Drone(droneId));
+            for (int droneId = 0; droneId < droneCount; droneId++)
+                Drones.Add(new Drone(droneId, teamId));
         }
 
         public IList<Drone> Drones { get; private set; }
@@ -87,7 +87,7 @@ namespace Player
         // read initial games data (one time at the beginning of the game: P I D Z...)
         public void Init()
         {
-            var pidz = ReadIntegers();
+            int[] pidz = ReadIntegers();
 
             MyTeamId = pidz[1];
             Zones = ReadZones(pidz[3]).ToList();
@@ -96,30 +96,30 @@ namespace Player
 
         IEnumerable<Zone> ReadZones(int zoneCount)
         {
-            for (var areaId = 0; areaId < zoneCount; areaId++)
-                yield return new Zone { Center = ReadPoint() };
+            for (int areaId = 0; areaId < zoneCount; areaId++)
+                yield return new Zone { Id = areaId, Center = ReadPoint() };
         }
 
         IEnumerable<Team> ReadTeams(int teamCount, int dronesPerTeam)
         {
-            for (var teamId = 0; teamId < teamCount; teamId++)
-                yield return new Team(dronesPerTeam);
+            for (int teamId = 0; teamId < teamCount; teamId++)
+                yield return new Team(dronesPerTeam, teamId);
         }
 
         public void ReadContext()
         {
-            foreach (var zone in Zones)
+            foreach (Zone zone in Zones)
             {
                 zone.OwnerId = ReadIntegers()[0];
                 zone.Drones = new List<Drone>();
             }
 
-            foreach (var team in Teams)
+            foreach (Team team in Teams)
             {
-                foreach (var drone in team.Drones)
+                foreach (Drone drone in team.Drones)
                 {
                     drone.Position = ReadPoint();
-                    foreach (var zone in Zones)
+                    foreach (Zone zone in Zones)
                     {
                         if (drone.In(zone))
                         {
@@ -142,10 +142,86 @@ namespace Player
 
         static Point ReadPoint()
         {
-            var xy = ReadIntegers();
+            int[] xy = ReadIntegers();
             return new Point { X = xy[0], Y = xy[1] };
         }
     }
+
+    #endregion
+
+    #region objective
+    public enum ObjectiveType
+    {
+        Retain,
+        Aquire
+    }
+
+    public class Objective
+    {
+        private readonly int _value;
+        private readonly Zone _zone;
+        private readonly ObjectiveType _type;
+
+        public Objective(Zone zone, int myTeamId)
+        {
+            _zone = zone;
+            _type = zone.OwnerId != myTeamId ? ObjectiveType.Aquire : ObjectiveType.Retain;
+            _value = CalculateValue(zone, myTeamId);
+        }
+
+        public int Value { get { return _value; } }
+        public Zone Zone { get { return _zone; } }
+        public ObjectiveType Type { get { return _type; } }
+
+        private int CalculateValue(Zone zone, int myTeamId)
+        {
+            int max = zone.Drones.GroupBy(x => x.TeamId).Select(group => group.Count()).Concat(new[] { 0 }).Max();
+            int mine = zone.Drones.Count(x => x.TeamId == myTeamId);
+
+            if (_type == ObjectiveType.Aquire)
+            {
+                return max - mine + 1;
+            }
+            if (_type == ObjectiveType.Retain)
+            {
+                return max;
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public int[] FindBestCandidates(IList<Drone> myDrones)
+        {
+            List<int> results = new List<int>();
+            int value = _value;
+
+            if (_type == ObjectiveType.Retain)
+            {
+                for (int i = myDrones.Count - 1; i >= 0; i--)
+                {
+                    if (value == 0) break;
+
+
+                    results.Add(myDrones[i].Id);
+                    myDrones.RemoveAt(i);
+                    value--;
+                }
+            }
+            if (_type == ObjectiveType.Aquire)
+            {
+                results.AddRange(myDrones.OrderBy(x => x.DistanceFrom(_zone)).Take(_value).Select(x => x.Id));
+                foreach (int id in results)
+                {
+                    myDrones.Remove(myDrones.First(x => x.Id == id));
+                }
+            }
+
+            return results.ToArray();
+        }
+    }
+    #endregion
 
     static class Program
     {
@@ -170,58 +246,48 @@ namespace Player
             Dictionary<int, Point> moves = new Dictionary<int, Point>();
             IList<Drone> myDrones = new List<Drone>(Teams[MyTeamId].Drones);
 
-            #region hold
-            foreach (Zone zone in Zones.Where(x => x.OwnerId == MyTeamId))
+            IList<Objective> objectives = Zones.Select(zone => new Objective(zone, MyTeamId)).OrderBy(x => x.Value).ToList();
+
+            foreach (Objective objective in objectives)
             {
-                for (int i = myDrones.Count - 1; i >= 0; i--)
+                int[] ids = objective.FindBestCandidates(myDrones);
+                foreach (int id in ids)
                 {
-                    if (myDrones[i].In(zone))
+                    moves.Add(id, objective.Zone.Center);
+                }
+            }
+
+            #region if any drones are not utilized send them to nearest objective
+            foreach (Drone drone in myDrones)
+            {
+                double min = double.MaxValue;
+                Point minPoint = new Point { X = 2000, Y = 900};
+                foreach (var objective in objectives)
+                {
+                    double tmpDistance = drone.DistanceFrom(objective.Zone);
+                    if (tmpDistance < min)
                     {
-                        moves.Add(myDrones[i].Id, zone.Center);
-                        myDrones.RemoveAt(i);
+                        min = tmpDistance;
+                        minPoint = objective.Zone.Center;
                     }
                 }
+
+                moves.Add(drone.Id, minPoint);
             }
             #endregion
 
-            #region conquer
-            int unoccupiedZones = Zones.Count(x => x.OwnerId == Zone.NoOwnerId);
-            int n = unoccupiedZones == 0 ? 0 : (myDrones.Count / unoccupiedZones) + 1;
-            foreach (Zone zone in Zones.Where(x => x.OwnerId == Zone.NoOwnerId))
-            {
-                List<int> topClosestDrones = myDrones.Select(drone => new KeyValuePair<int, double>(drone.Id, drone.DistanceFrom(zone))).ToList().OrderByDescending(x => x.Value).Select(x => x.Key).Take(n).ToList();
-                for (int i = myDrones.Count - 1; i >= 0; i--)
-                {
-                    if (topClosestDrones.Any(x => x == myDrones[i].Id))
-                    {
-                        moves.Add(myDrones[i].Id, zone.Center);
-                        myDrones.RemoveAt(i);
-                    }
-                }
-            }
-            #endregion
-
-            #region attack
-            int occupiedZones = Zones.Count(x => x.OwnerId != Zone.NoOwnerId && x.OwnerId != MyTeamId);
-            int m = occupiedZones == 0 ? 0 : (myDrones.Count / occupiedZones) + 1;
-            foreach (Zone zone in Zones.Where(x => x.OwnerId != Zone.NoOwnerId && x.OwnerId != MyTeamId))
-            {
-                List<int> topClosestDrones = myDrones.Select(drone => new KeyValuePair<int, double>(drone.Id, drone.DistanceFrom(zone))).ToList().OrderByDescending(x => x.Value).Select(x => x.Key).Take(m).ToList();
-                for (int i = myDrones.Count - 1; i >= 0; i--)
-                {
-                    if (topClosestDrones.Any(x => x == myDrones[i].Id))
-                    {
-                        moves.Add(myDrones[i].Id, zone.Center);
-                        myDrones.RemoveAt(i);
-                    }
-                }
-            }
-            #endregion
-
-            foreach (var key in moves.Keys)
+            foreach (int key in moves.Keys)
             {
                 Console.WriteLine("{0} {1}", moves[key].X, moves[key].Y);
             }
         }
+
+        private Point GetRandomObjectivePoint(IList<Objective> objectives)
+        {
+            Random rnd = new Random();
+            int index = rnd.Next(0, objectives.Count - 1);
+            return objectives[index].Zone.Center;
+        }
     }
+
 }
