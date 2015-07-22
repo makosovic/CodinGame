@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography.X509Certificates;
 
 namespace Player
 {
@@ -11,6 +10,40 @@ namespace Player
     {
         public int X { get; set; }
         public int Y { get; set; }
+
+        public static bool operator ==(Point a, Point b)
+        {
+            // If both are null, or both are same instance, return true.
+            if (Object.ReferenceEquals(a, b))
+            {
+                return true;
+            }
+
+            // If one is null, but not both, return false.
+            if (((object)a == null) || ((object)b == null))
+            {
+                return false;
+            }
+
+            // Return true if the fields match:
+            return a.X == b.X && a.Y == b.Y;
+        }
+        public static bool operator !=(Point a, Point b)
+        {
+            // If both are null, or both are same instance, return true.
+            if (Object.ReferenceEquals(a, b))
+            {
+                return false;
+            }
+
+            // If one is null, but not both, return false.
+            if (((object)a == null) || ((object)b == null))
+            {
+                return true;
+            }
+
+            return a.X != b.X || a.Y != b.Y;
+        }
     }
 
     public static class DroneExtensions
@@ -29,10 +62,15 @@ namespace Player
         public static bool In(this Drone drone, Zone zone)
         {
             return
-                drone.Position.X > zone.Center.X - Zone.SquareRadius &&
-                drone.Position.X < zone.Center.X + Zone.SquareRadius &&
-                drone.Position.Y > zone.Center.Y - Zone.SquareRadius &&
-                drone.Position.Y < zone.Center.Y + Zone.SquareRadius;
+                (Math.Pow(drone.Position.X - zone.Center.X, 2) +
+                 Math.Pow(drone.Position.Y - zone.Center.Y, 2)) < Math.Pow(Zone.Radius, 2);
+        }
+
+        public static bool InProximity(this Drone drone, Zone zone)
+        {
+            return
+                (Math.Pow(drone.Position.X - zone.Center.X, 2) +
+                 Math.Pow(drone.Position.Y - zone.Center.Y, 2)) < Math.Pow(Zone.ProximityRadius, 2);
         }
     }
 
@@ -41,6 +79,7 @@ namespace Player
         public int Id { get; set; }
         public Point Position { get; set; }
         public int TeamId { get; set; }
+        public Objective Objective { get; set; }
 
         public Drone(int droneId, int teamId)
         {
@@ -52,13 +91,14 @@ namespace Player
     public class Zone
     {
         public const int NoOwnerId = -1;
-        public const int Radius = 100;
-        public const double SquareRadius = 70.7106781;
+        public const int Radius = 95;
+        public const int ProximityRadius = 245;
 
         public Point Center { get; set; }
         public int Id { get; set; }
         public int OwnerId { get; set; }
         public List<Drone> Drones { get; set; }
+        public int DroneFrequency { get; set; }
 
         public Zone()
         {
@@ -125,6 +165,10 @@ namespace Player
                         {
                             zone.Drones.Add(drone);
                         }
+                        if (drone.InProximity(zone))
+                        {
+                            zone.DroneFrequency++;
+                        }
                     }
                 }
             }
@@ -158,7 +202,7 @@ namespace Player
 
     public class Objective
     {
-        private readonly int _value;
+        private readonly int _cost;
         private readonly Zone _zone;
         private readonly ObjectiveType _type;
 
@@ -166,10 +210,10 @@ namespace Player
         {
             _zone = zone;
             _type = zone.OwnerId != myTeamId ? ObjectiveType.Aquire : ObjectiveType.Retain;
-            _value = CalculateValue(zone, myTeamId);
+            _cost = CalculateValue(zone, myTeamId);
         }
 
-        public int Value { get { return _value; } }
+        public int Cost { get { return _cost; } }
         public Zone Zone { get { return _zone; } }
         public ObjectiveType Type { get { return _type; } }
 
@@ -195,23 +239,21 @@ namespace Player
         public int[] FindBestCandidates(IList<Drone> myDrones)
         {
             List<int> results = new List<int>();
-            int value = _value;
+            int cost = _cost;
 
             if (_type == ObjectiveType.Retain)
             {
                 for (int i = myDrones.Count - 1; i >= 0; i--)
                 {
-                    if (value == 0) break;
-
-
+                    if (cost == 0) break;
                     results.Add(myDrones[i].Id);
                     myDrones.RemoveAt(i);
-                    value--;
+                    cost--;
                 }
             }
             if (_type == ObjectiveType.Aquire)
             {
-                results.AddRange(myDrones.OrderBy(x => x.DistanceFrom(_zone)).Take(_value).Select(x => x.Id));
+                results.AddRange(myDrones.OrderBy(x => x.DistanceFrom(_zone)).Take(_cost).Select(x => x.Id));
                 foreach (int id in results)
                 {
                     myDrones.Remove(myDrones.First(x => x.Id == id));
@@ -246,29 +288,48 @@ namespace Player
             Dictionary<int, Point> moves = new Dictionary<int, Point>();
             IList<Drone> myDrones = new List<Drone>(Teams[MyTeamId].Drones);
 
-            IList<Objective> objectives = Zones.Select(zone => new Objective(zone, MyTeamId)).OrderBy(x => x.Value).ToList();
-
-            foreach (Objective objective in objectives)
+            #region hold
+            foreach (Zone zone in Zones.Where(x => x.OwnerId == MyTeamId))
             {
-                int[] ids = objective.FindBestCandidates(myDrones);
-                foreach (int id in ids)
+                for (int i = myDrones.Count - 1; i >= 0; i--)
                 {
-                    moves.Add(id, objective.Zone.Center);
+                    if (myDrones[i].In(zone))
+                    {
+                        moves.Add(myDrones[i].Id, zone.Center);
+                        myDrones.RemoveAt(i);
+                    }
                 }
             }
+            #endregion
+
+            #region attack
+            int m = Teams.First().Drones.Count/Zones.Count + 1;
+            foreach (Zone zone in Zones.Where(x => x.OwnerId != MyTeamId))
+            {
+                List<int> topClosestDrones = myDrones.Select(drone => new KeyValuePair<int, double>(drone.Id, drone.DistanceFrom(zone))).ToList().OrderByDescending(x => x.Value).Select(x => x.Key).Take(m).ToList();
+                for (int i = myDrones.Count - 1; i >= 0; i--)
+                {
+                    if (topClosestDrones.Any(x => x == myDrones[i].Id))
+                    {
+                        moves.Add(myDrones[i].Id, zone.Center);
+                        myDrones.RemoveAt(i);
+                    }
+                }
+            }
+            #endregion
 
             #region if any drones are not utilized send them to nearest objective
             foreach (Drone drone in myDrones)
             {
                 double min = double.MaxValue;
-                Point minPoint = new Point { X = 2000, Y = 900};
-                foreach (var objective in objectives)
+                Point minPoint = new Point { X = 2000, Y = 900 };
+                foreach (Zone zone in Zones)
                 {
-                    double tmpDistance = drone.DistanceFrom(objective.Zone);
+                    double tmpDistance = drone.DistanceFrom(zone);
                     if (tmpDistance < min)
                     {
                         min = tmpDistance;
-                        minPoint = objective.Zone.Center;
+                        minPoint = zone.Center;
                     }
                 }
 
@@ -276,17 +337,10 @@ namespace Player
             }
             #endregion
 
-            foreach (int key in moves.Keys)
+            foreach (var key in moves.Keys)
             {
                 Console.WriteLine("{0} {1}", moves[key].X, moves[key].Y);
             }
-        }
-
-        private Point GetRandomObjectivePoint(IList<Objective> objectives)
-        {
-            Random rnd = new Random();
-            int index = rnd.Next(0, objectives.Count - 1);
-            return objectives[index].Zone.Center;
         }
     }
 
