@@ -218,14 +218,14 @@ namespace TronBattle
         public Move GetMove(int?[,] board, Position currentPlayerPosition)
         {
             MoveValidator validator = new MoveValidator();
-            if (validator.IsValid(Move.UP, board, currentPlayerPosition))
-                return Move.UP;
-            if (validator.IsValid(Move.RIGHT, board, currentPlayerPosition))
-                return Move.RIGHT;
             if (validator.IsValid(Move.DOWN, board, currentPlayerPosition))
                 return Move.DOWN;
+            if (validator.IsValid(Move.LEFT, board, currentPlayerPosition))
+                return Move.LEFT;
+            if (validator.IsValid(Move.UP, board, currentPlayerPosition))
+                return Move.UP;
 
-            return Move.LEFT;
+            return Move.RIGHT;
         }
     }
 

@@ -37,7 +37,7 @@ namespace TronBattle.Tests
         public void ReturnFalseIfMoveRightButRightTaken()
         {
             MoveValidator validator = new MoveValidator();
-            bool actual = validator.IsValid(Move.RIGHT, new GameState { Board = _board, MyPosition = _currentPlayerPosition });
+            bool actual = validator.IsValid(Move.RIGHT, _board, _currentPlayerPosition);
             Assert.IsFalse(actual);
         }
 
@@ -45,7 +45,7 @@ namespace TronBattle.Tests
         public void ReturnDownForGivenBoard()
         {
             IMoveFactory factory = new ValidMoveFactory();
-            Move actual = factory.GetMove(new GameState { Board = _board, MyPosition = _currentPlayerPosition });
+            Move actual = factory.GetMove(_board,_currentPlayerPosition);
             Assert.AreEqual(Move.DOWN, actual);
         }
     }
