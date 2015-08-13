@@ -7,8 +7,8 @@
     <ProjectGuid>{E5E1AC42-0406-4E83-AE66-B417E059FCE0}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Tron_Battle</RootNamespace>
-    <AssemblyName>Tron Battle</AssemblyName>
+    <RootNamespace>TronBattle</RootNamespace>
+    <AssemblyName>TronBattle</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
